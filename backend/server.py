@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import mimetypes
 import requests
 from flask import Flask, jsonify, request, send_from_directory
+from flask_cors import CORS
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
 
