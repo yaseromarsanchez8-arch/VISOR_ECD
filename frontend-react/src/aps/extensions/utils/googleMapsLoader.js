@@ -4,7 +4,7 @@ function getApiKey() {
   return (
     window.__GOOGLE_MAPS_API_KEY ||
     import.meta.env?.VITE_GOOGLE_MAPS_API_KEY ||
-    ''
+    'AIzaSyDquuJhCuX0nVpHJAb-L6Ih9yguEqy6KjI' // Clave correcta hardcoded
   );
 }
 

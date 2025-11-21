@@ -299,11 +299,51 @@ const Viewer = ({ models, sprites, showSprites, activeSpriteId, onSpriteSelect, 
         sprites.forEach(sprite => {
             const position = sprite.position || { x: 0, y: 0, z: 0 };
             const colorHex = sprite.id === activeSpriteId ? 0x3aa0ff : 0xff5a5a;
-            const material = new THREE.SpriteMaterial({ color: colorHex, sizeAttenuation: false });
+
+            // Create a much larger, more visible sprite
+            const canvas = document.createElement('canvas');
+            canvas.width = 128;
+            canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+
+            // Draw a glowing circle
+            const centerX = 64;
+            const centerY = 64;
+            const radius = 50;
+
+            // Outer glow
+            const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
+            gradient.addColorStop(0, sprite.id === activeSpriteId ? 'rgba(58, 160, 255, 1)' : 'rgba(255, 90, 90, 1)');
+            gradient.addColorStop(0.5, sprite.id === activeSpriteId ? 'rgba(58, 160, 255, 0.8)' : 'rgba(255, 90, 90, 0.8)');
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, 128, 128);
+
+            // Inner bright circle
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 30, 0, Math.PI * 2);
+            ctx.fillStyle = sprite.id === activeSpriteId ? '#60a5fa' : '#ff7a7a';
+            ctx.fill();
+
+            // White center dot
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 15, 0, Math.PI * 2);
+            ctx.fillStyle = 'white';
+            ctx.fill();
+
+            const texture = new THREE.CanvasTexture(canvas);
+            const material = new THREE.SpriteMaterial({
+                map: texture,
+                transparent: true,
+                depthTest: false,  // Always visible, even behind objects
+                depthWrite: false
+            });
             const spriteMesh = new THREE.Sprite(material);
             spriteMesh.position.set(position.x, position.y, position.z);
-            spriteMesh.scale.set(2, 2, 2);
+            spriteMesh.scale.set(20, 20, 20);  // Much larger
             spriteMesh.userData.sprite = sprite;
+            spriteMesh.renderOrder = 999;  // Render on top
             viewer.impl.addOverlay(overlayName, spriteMesh);
             spriteMeshesRef.current[sprite.id] = spriteMesh;
         });
@@ -327,14 +367,24 @@ const Viewer = ({ models, sprites, showSprites, activeSpriteId, onSpriteSelect, 
             const x = event.clientX - rect.left;
             const y = event.clientY - rect.top;
             const hit = viewer.impl.hitTest(x, y, true);
-            console.log('sprite placement', hit);
-            if (hit && onPlacementComplete) {
-                onPlacementComplete({
+            console.log('Sprite placement - Hit test result:', hit);
+
+            if (hit && hit.point) {
+                console.log('✓ Sprite placed at:', {
                     position: { x: hit.point.x, y: hit.point.y, z: hit.point.z },
                     dbId: hit.dbId
                 });
-            } else if (onPlacementComplete) {
-                onPlacementComplete(null);
+                if (onPlacementComplete) {
+                    onPlacementComplete({
+                        position: { x: hit.point.x, y: hit.point.y, z: hit.point.z },
+                        dbId: hit.dbId
+                    });
+                }
+            } else {
+                console.warn('✗ No geometry detected at click position. Try clicking directly on the 3D model.');
+                if (onPlacementComplete) {
+                    onPlacementComplete(null);
+                }
             }
         };
         target.addEventListener('click', handlePlacement, true);

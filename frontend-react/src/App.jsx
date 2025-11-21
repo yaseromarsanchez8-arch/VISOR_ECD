@@ -5,6 +5,8 @@ import Viewer from './components/Viewer';
 import ImportModelModal from './components/ImportModelModal';
 import DocumentPanel from './components/DocumentPanel';
 import AddDocumentModal from './components/AddDocumentModal';
+import BuildPanel from './components/BuildPanel';
+import BuildMapView from './components/BuildMapView';
 
 const FilterIcon = () => (
   <svg
@@ -103,6 +105,28 @@ const DocumentIcon = () => (
   </svg>
 );
 
+const BuildIcon = () => (
+  <svg
+    className="rail-icon"
+    width="22"
+    height="22"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.6"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M3 9h18l-1 10H4L3 9z" />
+    <rect x="9" y="9" width="6" height="6" rx="1.5" />
+    <path d="M2.5 19.5h19" />
+    <path d="M6 13l-3.5 7.5M18 13l3.5 7.5" />
+    <path d="M10 19.5l-2.5 4M14 19.5l2.5 4" />
+    <path d="M12 19.5v4" />
+  </svg>
+);
+
 const normalizePropertyList = (detail = []) => {
   return detail.map((item, index) => {
     if (typeof item === 'string') {
@@ -136,9 +160,9 @@ const groupProperties = (properties, query = '') => {
   const normalizedQuery = query.trim().toLowerCase();
   const filtered = normalizedQuery
     ? properties.filter(prop =>
-        prop.name.toLowerCase().includes(normalizedQuery) ||
-        (prop.path || '').toLowerCase().includes(normalizedQuery)
-      )
+      prop.name.toLowerCase().includes(normalizedQuery) ||
+      (prop.path || '').toLowerCase().includes(normalizedQuery)
+    )
     : properties;
   const map = new Map();
   filtered.forEach(prop => {
@@ -258,7 +282,7 @@ function FilterConfigurator({
     .filter(prop =>
       selectedQuery.trim()
         ? prop.name.toLowerCase().includes(selectedQuery.trim().toLowerCase()) ||
-          (prop.path || '').toLowerCase().includes(selectedQuery.trim().toLowerCase())
+        (prop.path || '').toLowerCase().includes(selectedQuery.trim().toLowerCase())
         : true
     );
 
@@ -396,6 +420,7 @@ function App() {
   const [panelVisible, setPanelVisible] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [documentsModalOpen, setDocumentsModalOpen] = useState(false);
+  const [buildUploads, setBuildUploads] = useState([]);
   const [filterConfiguratorOpen, setFilterConfiguratorOpen] = useState(false);
   const [availableProperties, setAvailableProperties] = useState([]);
   const [filterProperties, setFilterProperties] = useState([]);
@@ -403,9 +428,115 @@ function App() {
   const [filterSelections, setFilterSelections] = useState({});
   const [expandedFilters, setExpandedFilters] = useState({});
   const [showSplash, setShowSplash] = useState(true);
+  const [buildUploading, setBuildUploading] = useState(false);
+  const [buildUploadError, setBuildUploadError] = useState('');
+  const [buildPins, setBuildPins] = useState(() => {
+    const saved = localStorage.getItem('buildPins');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [selectedPinId, setSelectedPinId] = useState(null);
+  const [userLocation, setUserLocation] = useState(null);
   const handleModelProperties = useCallback((props = []) => {
     setModelProperties(props);
   }, []);
+
+  // Persist pins to localStorage
+  useEffect(() => {
+    localStorage.setItem('buildPins', JSON.stringify(buildPins));
+  }, [buildPins]);
+
+  // Get user geolocation
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          });
+        },
+        () => {
+          setUserLocation({ lat: -12.0464, lng: -77.0428 });
+        }
+      );
+    } else {
+      setUserLocation({ lat: -12.0464, lng: -77.0428 });
+    }
+  }, []);
+
+  const handlePinCreated = useCallback((pin) => {
+    setBuildPins(prev => {
+      const newPins = [...prev, pin];
+      return newPins;
+    });
+    setSelectedPinId(pin.id); // Auto-select new pin
+  }, []);
+
+  const handlePinSelect = useCallback((pinId) => {
+    setSelectedPinId(pinId);
+  }, []);
+
+  const handlePinDelete = useCallback((pinId) => {
+    setBuildPins(prev => prev.filter(p => p.id !== pinId));
+    if (selectedPinId === pinId) {
+      setSelectedPinId(null);
+    }
+  }, [selectedPinId]);
+
+  const handleBuildFileUpload = async (file) => {
+    if (!selectedPinId) {
+      alert('Por favor, selecciona un punto en el mapa primero para asociar el documento.');
+      return;
+    }
+
+    setBuildUploading(true);
+    setBuildUploadError(null);
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await fetch('http://127.0.0.1:3000/api/build/acc-upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Upload failed');
+      }
+
+      const data = await response.json();
+      console.log('Build upload response:', data);
+
+      // Add document to the selected PIN
+      setBuildPins(prevPins => prevPins.map(pin => {
+        if (pin.id === selectedPinId) {
+          return {
+            ...pin,
+            documents: [...(pin.documents || []), {
+              id: Date.now(),
+              name: file.name,
+              urn: data.urn,
+              storageId: data.storage_id,
+              versionId: data.version_id,
+              itemId: data.item_id,
+              url: data.url || URL.createObjectURL(file), // Fallback to local blob for immediate preview
+              status: 'processing',
+              timestamp: new Date().toISOString()
+            }]
+          };
+        }
+        return pin;
+      }));
+
+    } catch (err) {
+      console.error('Build upload error:', err);
+      setBuildUploadError(err.message);
+    } finally {
+      setBuildUploading(false);
+    }
+  };
 
   useEffect(() => {
     const handleProperties = (event) => {
@@ -489,6 +620,90 @@ function App() {
     setModels(prev => prev.filter(model => model.urn !== urn));
   }, []);
 
+  const loadSingleModel = useCallback((model) => {
+    if (!model?.urn) return;
+    const label = model.name || 'Documento Build';
+    // Replace all models with just this one
+    setModels([{ ...model, label }]);
+  }, []);
+
+  const pollTranslationStatus = useCallback(async (urn) => {
+    const checkStatus = async () => {
+      try {
+        // Encode URN twice to ensure slashes are handled correctly by proxies/servers
+        const encodedUrn = encodeURIComponent(urn);
+        const response = await fetch(`/api/build/translation-status?urn=${encodedUrn}`);
+        const data = await response.json();
+        if (data.status === 'success') {
+          setBuildUploads(prev => prev.map(f => f.urn === urn ? { ...f, status: 'success' } : f));
+        } else if (data.status === 'failed') {
+          setBuildUploads(prev => prev.map(f => f.urn === urn ? { ...f, status: 'failed' } : f));
+        } else {
+          setTimeout(checkStatus, 5000); // Retry in 5s
+        }
+      } catch (error) {
+        console.error("Polling error", error);
+      }
+    };
+    checkStatus();
+  }, []);
+
+  const removeBuildUpload = useCallback((id) => {
+    setBuildUploads(prev => prev.filter(file => file.id !== id));
+  }, []);
+
+  const fetchSignedRead = useCallback(async (file) => {
+    const storageId = file.storageId || file.storage_id;
+    const projectId = file.projectId || file.project_id;
+    const versionId = file.versionId || file.version_id;
+    const body = storageId ? { storageId } : { projectId, versionId };
+    const resp = await fetch('/api/build/signed-read', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      throw new Error(data.error || 'No se pudo obtener URL firmada de lectura.');
+    }
+    return data.signedUrl || data.url;
+  }, []);
+
+  const openBuildMap = useCallback(async (file) => {
+    const lower = (file.name || '').toLowerCase();
+    const isKml = lower.endsWith('.kml') || lower.endsWith('.kmz') || (file.type || '').includes('kml');
+    if (!isKml) {
+      alert('Selecciona un archivo KML o KMZ para verlo en Maps.');
+      return;
+    }
+    try {
+      const signedUrl = await fetchSignedRead(file);
+      window.dispatchEvent(new CustomEvent('maps-open-google', {
+        detail: {
+          job: {
+            status: 'ready',
+            tileset_url: signedUrl || file.url
+          }
+        }
+      }));
+    } catch (err) {
+      console.error('No se obtuvo signed URL, usando fallback.', err);
+      const fallback = file.url;
+      if (!fallback) {
+        alert(err.message || 'No se pudo obtener URL firmada.');
+        return;
+      }
+      window.dispatchEvent(new CustomEvent('maps-open-google', {
+        detail: {
+          job: {
+            status: 'ready',
+            tileset_url: fallback
+          }
+        }
+      }));
+    }
+  }, [fetchSignedRead]);
+
   const addDocuments = useCallback((items) => {
     if (!items?.length) return;
     setDocuments(prev => {
@@ -510,10 +725,10 @@ function App() {
   const addSprite = useCallback(({ position, dbId }) => {
     const pos = position
       ? {
-          x: position.x ?? position.X ?? position[0] ?? 0,
-          y: position.y ?? position.Y ?? position[1] ?? 0,
-          z: position.z ?? position.Z ?? position[2] ?? 0
-        }
+        x: position.x ?? position.X ?? position[0] ?? 0,
+        y: position.y ?? position.Y ?? position[1] ?? 0,
+        z: position.z ?? position.Z ?? position[2] ?? 0
+      }
       : { x: 0, y: 0, z: 0 };
     setSprites(prev => {
       const id = `sprite-${Date.now()}-${prev.length + 1}`;
@@ -525,11 +740,17 @@ function App() {
   }, []);
 
   const requestSpritePlacement = useCallback(() => {
+    // Check if there's at least one model loaded
+    if (models.length === 0) {
+      alert('Please load a 3D model first before adding sprites.\n\n1. Go to "Files" panel\n2. Select a model from Autodesk Docs\n3. Then return to "Docs" and click "+ Add sprite"');
+      return;
+    }
+
     setActivePanel('docs');
     setPanelVisible(true);
     setShowSprites(true);
     setSpritePlacementActive(true);
-  }, []);
+  }, [models]);
 
   const handlePlacementComplete = useCallback((payload) => {
     if (!payload) {
@@ -628,6 +849,10 @@ function App() {
     setExpandedFilters(prev => ({ ...prev, [propId]: !prev[propId] }));
   }, []);
 
+  const handlePinUpdate = (updatedPin) => {
+    setBuildPins(prev => prev.map(p => p.id === updatedPin.id ? updatedPin : p));
+  };
+
   return (
     <div className="app-container">
       {showSplash && (
@@ -662,6 +887,15 @@ function App() {
         >
           <DocumentIcon />
           <span className="rail-label">Docs</span>
+        </button>
+        <button
+          type="button"
+          className={`rail-button ${activePanel === 'build' && panelVisible ? 'active' : ''}`}
+          onClick={() => togglePanel('build')}
+          title="Build"
+        >
+          <BuildIcon />
+          <span className="rail-label">Build</span>
         </button>
       </nav>
 
@@ -807,19 +1041,43 @@ function App() {
             onRequestSprite={requestSpritePlacement}
           />
         )}
+        {activePanel === 'build' && (
+          <BuildPanel
+            buildUploads={buildUploads}
+            pins={buildPins}
+            selectedPinId={selectedPinId}
+            onPinSelect={handlePinSelect}
+            onFileUpload={handleBuildFileUpload}
+            uploading={buildUploading}
+            uploadError={buildUploadError}
+          />
+        )}
       </aside>
 
       <div className="app-viewer">
-        <Viewer
-          models={models}
-          sprites={sprites}
-          showSprites={showSprites}
-          activeSpriteId={activeSpriteId}
-          onSpriteSelect={handleSpriteSelect}
-          placementMode={spritePlacementActive}
-          onPlacementComplete={handlePlacementComplete}
-          onModelProperties={handleModelProperties}
-        />
+        {activePanel === 'build' ? (
+          <BuildMapView
+            userLocation={userLocation}
+            pins={buildPins}
+            selectedPinId={selectedPinId}
+            onPinCreated={handlePinCreated}
+            onPinSelect={handlePinSelect}
+            onPinDelete={handlePinDelete}
+            onPinUpdate={handlePinUpdate}
+            onFileUpload={handleBuildFileUpload}
+          />
+        ) : (
+          <Viewer
+            models={models}
+            sprites={sprites}
+            showSprites={showSprites}
+            activeSpriteId={activeSpriteId}
+            onSpriteSelect={handleSpriteSelect}
+            placementMode={spritePlacementActive}
+            onPlacementComplete={handlePlacementComplete}
+            onModelProperties={handleModelProperties}
+          />
+        )}
       </div>
 
       <ImportModelModal

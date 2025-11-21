@@ -1127,14 +1127,13 @@ export class PhasingExtension extends Autodesk.Viewing.Extension {
     }
     if (!this.googleMapsPanel) {
       this.googleMapsPanel = new GoogleMapsPanel(this.viewer);
-      this.googleMapsPanel.container.style.width = '520px';
-      this.googleMapsPanel.container.style.height = '420px';
-      this.googleMapsPanel.container.style.left = '460px';
-      this.googleMapsPanel.container.style.top = '40px';
+      this.googleMapsPanel.container.style.width = '100%';
+      this.googleMapsPanel.container.style.height = '100%';
+      this.googleMapsPanel.container.style.left = '0';
+      this.googleMapsPanel.container.style.top = '0';
       this.googleMapsPanel.initialize();
     }
-    if (job?.tileset_url && this.googleMapsPanel.urlInput) {
-      this.googleMapsPanel.urlInput.value = job.tileset_url;
+    if (job?.tileset_url) {
       this.googleMapsPanel.kmlUrl = job.tileset_url;
     }
     this.googleMapsPanel.ensureMapReady();

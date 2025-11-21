@@ -55,79 +55,49 @@ export default class GoogleMapsPanel extends Autodesk.Viewing.UI.DockingPanel {
     this.title = this.createTitleBar('Vista Google Maps');
     this.container.appendChild(this.title);
     this.initializeMoveHandlers(this.title);
-    this.container.style.resize = 'both';
-    this.container.style.minWidth = '360px';
-    this.container.style.minHeight = '280px';
+    this.container.style.position = 'fixed';
+    this.container.style.inset = '0';
+    this.container.style.zIndex = '5000';
+    this.container.style.resize = 'none';
+    this.container.style.minWidth = '100%';
+    this.container.style.minHeight = '100%';
     this.container.style.overflow = 'auto';
     this.container.style.background = '#fefefe';
+    this.container.style.boxShadow = 'none';
+    this.container.style.borderRadius = '0';
 
     const body = document.createElement('div');
-    body.style.padding = '10px';
+    body.style.padding = '16px';
     body.style.display = 'flex';
     body.style.flexDirection = 'column';
-    body.style.gap = '8px';
+    body.style.gap = '12px';
     this.container.appendChild(body);
 
-    const info = document.createElement('p');
-    info.style.margin = '0';
-    info.style.fontSize = '12px';
-    info.textContent = 'Carga un KML/KMZ (desde una URL o subiéndolo) para visualizar el proyecto sobre Google Maps.';
-    body.appendChild(info);
-
-    const urlLabel = document.createElement('label');
-    urlLabel.style.fontSize = '12px';
-    urlLabel.style.display = 'flex';
-    urlLabel.style.flexDirection = 'column';
-    urlLabel.textContent = 'URL del archivo KML/KMZ:';
-    this.urlInput = document.createElement('input');
-    this.urlInput.type = 'text';
-    this.urlInput.value = this.kmlUrl;
-    this.urlInput.placeholder = 'https://.../archivo.kmz';
-    this.urlInput.style.padding = '6px';
-    this.urlInput.style.border = '1px solid #ccc';
-    this.urlInput.style.borderRadius = '4px';
-    urlLabel.appendChild(this.urlInput);
-    body.appendChild(urlLabel);
-
-    const buttonsRow = document.createElement('div');
-    buttonsRow.style.display = 'flex';
-    buttonsRow.style.gap = '8px';
-    const loadBtn = document.createElement('button');
-    loadBtn.textContent = 'Cargar desde URL';
-    loadBtn.style.padding = '6px 10px';
-    loadBtn.onclick = () => this.loadKmlFromInput();
-    buttonsRow.appendChild(loadBtn);
-    body.appendChild(buttonsRow);
-
-    const uploadWrapper = document.createElement('div');
-    uploadWrapper.style.display = 'flex';
-    uploadWrapper.style.flexDirection = 'column';
-    uploadWrapper.style.gap = '4px';
-    uploadWrapper.style.fontSize = '12px';
-    uploadWrapper.textContent = 'Subir archivo KML/KMZ (se almacenará temporalmente en el servidor):';
-    this.fileInput = document.createElement('input');
-    this.fileInput.type = 'file';
-    this.fileInput.accept = '.kml,.kmz';
-    uploadWrapper.appendChild(this.fileInput);
-    const uploadBtn = document.createElement('button');
-    uploadBtn.textContent = 'Subir y cargar';
-    uploadBtn.style.padding = '6px 10px';
-    uploadBtn.onclick = () => this.handleUpload();
-    uploadWrapper.appendChild(uploadBtn);
-    body.appendChild(uploadWrapper);
-
-    this.noticeEl = document.createElement('div');
-    this.noticeEl.style.background = '#fff8c4';
-    this.noticeEl.style.border = '1px solid #f5d470';
-    this.noticeEl.style.padding = '6px';
-    this.noticeEl.style.fontSize = '12px';
-    this.noticeEl.textContent = 'Preparando Google Maps...';
-    body.appendChild(this.noticeEl);
+    const chipRow = document.createElement('div');
+    chipRow.style.display = 'flex';
+    chipRow.style.gap = '10px';
+    chipRow.style.flexWrap = 'wrap';
+    const makeChip = (label) => {
+      const btn = document.createElement('button');
+      btn.textContent = label;
+      btn.style.padding = '10px 14px';
+      btn.style.borderRadius = '14px';
+      btn.style.border = '1px solid #cbd5dc';
+      btn.style.background = '#f3f4f6';
+      btn.style.cursor = 'pointer';
+      btn.style.fontSize = '13px';
+      btn.style.fontWeight = '600';
+      return btn;
+    };
+    chipRow.appendChild(makeChip('Fecha'));
+    chipRow.appendChild(makeChip('Especialidad'));
+    body.appendChild(chipRow);
 
     this.mapContainer = document.createElement('div');
-    this.mapContainer.style.height = '320px';
+    this.mapContainer.style.height = 'calc(100vh - 240px)';
+    this.mapContainer.style.minHeight = '360px';
     this.mapContainer.style.border = '1px solid #d0d0d0';
-    this.mapContainer.style.borderRadius = '6px';
+    this.mapContainer.style.borderRadius = '8px';
     body.appendChild(this.mapContainer);
 
     this.ensureMapReady();
@@ -136,7 +106,6 @@ export default class GoogleMapsPanel extends Autodesk.Viewing.UI.DockingPanel {
   async ensureMapReady() {
     try {
       const maps = await ensureGoogleMapsLoaded();
-      this.noticeEl.style.display = 'none';
       if (!this.map) {
         this.map = new maps.Map(this.mapContainer, {
           center: DEFAULT_CENTER,
@@ -155,22 +124,9 @@ export default class GoogleMapsPanel extends Autodesk.Viewing.UI.DockingPanel {
     }
   }
 
-  loadKmlFromInput() {
-    const value = (this.urlInput.value || '').trim();
-    if (!value) {
-      this.showNotice('Proporciona la URL de un archivo KML o KMZ accesible.');
-      return;
-    }
-    const resolved = resolveUrl(value);
-    this.kmlUrl = resolved;
-    this.loadKml(resolved);
-  }
-
   async loadKml(url) {
     if (!this.map || !url) return;
     try {
-      this.noticeEl.style.display = 'block';
-      this.noticeEl.textContent = 'Descargando recurso...';
       // Clear previous data layer features.
       this.map.data.forEach(feature => this.map.data.remove(feature));
       this.clearLabels();
