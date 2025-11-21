@@ -222,6 +222,39 @@ def serve_uploaded_document(filename):
     response.headers['Access-Control-Allow-Headers'] = '*'
     return response
 
+def refresh_user_tokens(tokens):
+    refresh_token = tokens.get('refresh_token')
+    if not refresh_token:
+        return None
+    
+    client_id = os.getenv('APS_CLIENT_ID')
+    client_secret = os.getenv('APS_CLIENT_SECRET')
+    
+    try:
+        print("Refreshing 3-legged token...")
+        resp = requests.post(
+            'https://developer.api.autodesk.com/authentication/v2/token',
+            data={
+                'grant_type': 'refresh_token',
+                'refresh_token': refresh_token,
+                'client_id': client_id,
+                'client_secret': client_secret
+            }
+        )
+        resp.raise_for_status()
+        new_tokens = resp.json()
+        
+        # Save new tokens
+        tokens_path = os.path.join(os.path.dirname(__file__), 'tokens.json')
+        with open(tokens_path, 'w', encoding='utf-8') as f:
+            import json
+            json.dump(new_tokens, f, ensure_ascii=False, indent=2)
+            
+        return new_tokens
+    except Exception as e:
+        print(f"Error refreshing token: {e}")
+        return None
+
 def load_user_tokens():
     tokens_path = os.path.join(os.path.dirname(__file__), 'tokens.json')
     if not os.path.exists(tokens_path):
@@ -229,9 +262,32 @@ def load_user_tokens():
     try:
         import json
         with open(tokens_path, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except OSError:
+            tokens = json.load(f)
+            
+        # Check expiration based on file modification time
+        mtime = os.path.getmtime(tokens_path)
+        age = time.time() - mtime
+        expires_in = tokens.get('expires_in', 3599)
+        
+        # Refresh if token is older than (expires_in - 5 minutes)
+        if age > (expires_in - 300):
+            print(f"Token age {int(age)}s > {expires_in - 300}s. Refreshing...")
+            new_tokens = refresh_user_tokens(tokens)
+            if new_tokens:
+                return new_tokens
+            else:
+                print("Failed to refresh token. It might be invalid.")
+                return None
+        
+        return tokens
+    except Exception as e:
+        print(f"Error loading tokens: {e}")
         return None
+
+@app.route('/api/auth/status')
+def auth_status():
+    tokens = load_user_tokens()
+    return jsonify({'connected': tokens is not None})
 
 import base64
 

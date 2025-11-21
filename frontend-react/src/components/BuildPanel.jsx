@@ -18,6 +18,15 @@ const BuildPanel = ({
         }
     };
 
+    const [isConnected, setIsConnected] = React.useState(false);
+
+    React.useEffect(() => {
+        fetch('/api/auth/status')
+            .then(res => res.json())
+            .then(data => setIsConnected(data.connected))
+            .catch(err => console.error('Auth check failed', err));
+    }, []);
+
     return (
         <div className="build-panel">
             <header className="build-panel-header">
@@ -27,23 +36,41 @@ const BuildPanel = ({
                         {pins.length} puntos registrados
                     </span>
                 </div>
-                <button
-                    className="aps-login-btn"
-                    onClick={() => window.location.href = '/api/auth/login'}
-                    title="Conectar con Autodesk Construction Cloud"
-                    style={{
-                        background: '#0696D7',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        padding: '4px 8px',
-                        cursor: 'pointer',
+                {isConnected ? (
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
                         fontSize: '12px',
-                        marginLeft: 'auto'
-                    }}
-                >
-                    🔑 Conectar
-                </button>
+                        color: '#10b981',
+                        fontWeight: '600',
+                        marginLeft: 'auto',
+                        background: '#ecfdf5',
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                        border: '1px solid #a7f3d0'
+                    }}>
+                        <span style={{ fontSize: '10px' }}>🟢</span> Conectado
+                    </div>
+                ) : (
+                    <button
+                        className="aps-login-btn"
+                        onClick={() => window.location.href = '/api/auth/login'}
+                        title="Conectar con Autodesk Construction Cloud"
+                        style={{
+                            background: '#0696D7',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            padding: '4px 8px',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            marginLeft: 'auto'
+                        }}
+                    >
+                        🔑 Conectar
+                    </button>
+                )}
             </header>
 
             <div className="build-panel-info">
