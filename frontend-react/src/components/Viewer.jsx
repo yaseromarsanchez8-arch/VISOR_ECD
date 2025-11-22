@@ -16,6 +16,11 @@ const Viewer = ({ models, sprites, showSprites, activeSpriteId, onSpriteSelect, 
     const spriteMeshesRef = useRef({});
     const [viewerReady, setViewerReady] = useState(false);
 
+    // Context menu state for sprite creation
+    const [contextMenu, setContextMenu] = useState(null); // { visible, x, y, position, dbId }
+    const longPressTimerRef = useRef(null);
+    const isLongPressRef = useRef(false);
+
     const toMatrix4 = transform => {
         if (!window.THREE || !transform) return null;
         const matrix = new THREE.Matrix4();
@@ -394,7 +399,169 @@ const Viewer = ({ models, sprites, showSprites, activeSpriteId, onSpriteSelect, 
         };
     }, [placementMode, onPlacementComplete, viewerReady]);
 
-    return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />;
+    // Context menu for sprite creation (right-click / long-press)
+    useEffect(() => {
+        const viewer = viewerRef.current;
+        if (!viewer || !viewerReady) return;
+
+        const canvas = viewer.canvas || viewer.impl?.canvas || viewer.container;
+        if (!canvas) return;
+
+        const openSpriteMenu = (hitResult, clientX, clientY) => {
+            if (!hitResult || !hitResult.point) return;
+
+            setContextMenu({
+                visible: true,
+                x: clientX,
+                y: clientY,
+                position: { x: hitResult.point.x, y: hitResult.point.y, z: hitResult.point.z },
+                dbId: hitResult.dbId
+            });
+        };
+
+        // Right-click handler (desktop)
+        const handleContextMenu = (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            const rect = canvas.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            const hit = viewer.impl.hitTest(x, y, true);
+
+            if (hit && hit.point) {
+                openSpriteMenu(hit, event.clientX, event.clientY);
+            }
+        };
+
+        // Long-press handlers (mobile/tablet)
+        const handleMouseDown = (event) => {
+            // Ignore right-click (already handled by contextmenu)
+            if (event.button === 2) return;
+
+            // Ignore multi-touch
+            if (event.touches && event.touches.length > 1) return;
+
+            isLongPressRef.current = false;
+
+            longPressTimerRef.current = setTimeout(() => {
+                isLongPressRef.current = true;
+
+                const rect = canvas.getBoundingClientRect();
+                const clientX = event.touches ? event.touches[0].clientX : event.clientX;
+                const clientY = event.touches ? event.touches[0].clientY : event.clientY;
+                const x = clientX - rect.left;
+                const y = clientY - rect.top;
+                const hit = viewer.impl.hitTest(x, y, true);
+
+                if (hit && hit.point) {
+                    openSpriteMenu(hit, clientX, clientY);
+                }
+            }, 800);
+        };
+
+        const handleMouseUp = () => {
+            if (longPressTimerRef.current) {
+                clearTimeout(longPressTimerRef.current);
+            }
+        };
+
+        const handleMouseMove = () => {
+            if (longPressTimerRef.current) {
+                clearTimeout(longPressTimerRef.current);
+            }
+        };
+
+        // Close menu on any click outside
+        const handleClickOutside = () => {
+            setContextMenu(null);
+        };
+
+        canvas.addEventListener('contextmenu', handleContextMenu, true);
+        canvas.addEventListener('mousedown', handleMouseDown);
+        canvas.addEventListener('touchstart', handleMouseDown);
+        canvas.addEventListener('mouseup', handleMouseUp);
+        canvas.addEventListener('touchend', handleMouseUp);
+        canvas.addEventListener('mousemove', handleMouseMove);
+        canvas.addEventListener('touchmove', handleMouseMove);
+        window.addEventListener('click', handleClickOutside);
+
+        return () => {
+            canvas.removeEventListener('contextmenu', handleContextMenu, true);
+            canvas.removeEventListener('mousedown', handleMouseDown);
+            canvas.removeEventListener('touchstart', handleMouseDown);
+            canvas.removeEventListener('mouseup', handleMouseUp);
+            canvas.removeEventListener('touchend', handleMouseUp);
+            canvas.removeEventListener('mousemove', handleMouseMove);
+            canvas.removeEventListener('touchmove', handleMouseMove);
+            window.removeEventListener('click', handleClickOutside);
+
+            if (longPressTimerRef.current) {
+                clearTimeout(longPressTimerRef.current);
+            }
+        };
+    }, [viewerReady]);
+
+    const handleCreateSpriteFromMenu = () => {
+        if (contextMenu && contextMenu.position && onPlacementComplete) {
+            onPlacementComplete({
+                position: contextMenu.position,
+                dbId: contextMenu.dbId
+            });
+        }
+        setContextMenu(null);
+    };
+
+    return (
+        <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+            <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
+
+            {/* Sprite Context Menu */}
+            {contextMenu && contextMenu.visible && (
+                <div
+                    className="viewer-context-menu"
+                    style={{
+                        position: 'fixed',
+                        left: contextMenu.x,
+                        top: contextMenu.y,
+                        background: 'rgba(30, 41, 59, 0.98)',
+                        backdropFilter: 'blur(12px)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: '8px',
+                        padding: '8px',
+                        zIndex: 10000,
+                        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)'
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <button
+                        onClick={handleCreateSpriteFromMenu}
+                        style={{
+                            width: '100%',
+                            padding: '10px 16px',
+                            background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            fontWeight: '600',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '4px',
+                            transition: 'all 0.2s ease'
+                        }}
+                        onMouseEnter={(e) => e.target.style.transform = 'translateY(-1px)'}
+                        onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}
+                    >
+                        Crear Sprite
+                        <small style={{ fontSize: '11px', opacity: 0.9 }}>Marcador 3D</small>
+                    </button>
+                </div>
+            )}
+        </div>
+    );
 };
 
 export default Viewer;
