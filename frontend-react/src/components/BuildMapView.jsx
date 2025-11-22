@@ -299,23 +299,32 @@ const BuildMapView = ({
                     onPinSelectRef.current(pin.id);
                 }
 
-                // Open context menu on click too (for mobile/tablet friendliness)
-                // Use e.pixel if available, otherwise try to use domEvent
+                // Calculate correct position relative to container
                 let x = 0;
                 let y = 0;
 
                 if (e.pixel) {
                     x = e.pixel.x;
                     y = e.pixel.y;
-                } else if (e.domEvent) {
-                    // Fallback to mouse/touch event coordinates relative to viewport
-                    // We need relative to container? The context menu uses absolute positioning.
-                    // If the container is relative, we might need offset.
-                    // But usually e.pixel is reliable for Google Maps markers.
-                    x = e.domEvent.clientX;
-                    y = e.domEvent.clientY;
+                } else if (e.domEvent && mapContainerRef.current) {
+                    const rect = mapContainerRef.current.getBoundingClientRect();
+                    const evt = e.domEvent;
+
+                    // Handle Touch vs Mouse
+                    const clientX = evt.touches && evt.touches.length > 0 ? evt.touches[0].clientX :
+                        (evt.changedTouches && evt.changedTouches.length > 0 ? evt.changedTouches[0].clientX : evt.clientX);
+
+                    const clientY = evt.touches && evt.touches.length > 0 ? evt.touches[0].clientY :
+                        (evt.changedTouches && evt.changedTouches.length > 0 ? evt.changedTouches[0].clientY : evt.clientY);
+
+                    if (clientX !== undefined && clientY !== undefined) {
+                        x = clientX - rect.left;
+                        y = clientY - rect.top;
+                    }
                 }
 
+                // Fallback if still 0 (rare) or if we want to force center (not desired)
+                // If x/y are valid, show menu
                 if (x || y) {
                     setContextMenu({
                         visible: true,
