@@ -252,7 +252,50 @@ const BuildMapView = ({
 
     // --- Actions ---
 
-    // ... (handleCreatePin, handleDeletePin, handleDeleteDocument remain same) ...
+    const handleDeletePin = () => {
+        if (contextMenu && contextMenu.pinId) {
+            if (window.confirm('¿Estás seguro de eliminar este punto?')) {
+                if (onPinDelete) {
+                    onPinDelete(contextMenu.pinId);
+                }
+                setContextMenu(null);
+            }
+        }
+    };
+
+    const handleDeleteDocument = (doc) => {
+        const pinId = galleryPinId || contextMenu?.pinId;
+        if (!pinId) return;
+
+        if (window.confirm(`¿Eliminar documento "${doc.name}"?`)) {
+            const pin = pins.find(p => p.id === pinId);
+            if (pin) {
+                const updatedDocuments = pin.documents.filter(d => d.id !== doc.id);
+                const updatedPin = { ...pin, documents: updatedDocuments };
+                if (onPinUpdate) {
+                    onPinUpdate(updatedPin);
+                }
+            }
+        }
+    };
+
+    const handleCreatePin = () => {
+        if (contextMenu && contextMenu.latLng) {
+            const newPin = {
+                id: Date.now().toString(),
+                lat: contextMenu.latLng.lat,
+                lng: contextMenu.latLng.lng,
+                name: `Punto ${pins.length + 1}`,
+                documents: [],
+                createdAt: new Date().toISOString()
+            };
+
+            if (onPinCreated) {
+                onPinCreated(newPin);
+            }
+            setContextMenu(null);
+        }
+    };
 
     const handleToggleUploadOptions = (e) => {
         e.stopPropagation();
@@ -295,7 +338,11 @@ const BuildMapView = ({
     const activeGalleryPin = pins.find(p => p.id === galleryPinId);
 
     return (
-        <div className="build-map-container" style={{ position: 'relative', width: '100%', height: '100%' }}>
+        <div
+            className="build-map-container"
+            style={{ position: 'relative', width: '100%', height: '100%' }}
+            onContextMenu={(e) => e.preventDefault()}
+        >
             <div ref={mapContainerRef} className="build-map-view" />
 
             {/* Hidden File Inputs */}
