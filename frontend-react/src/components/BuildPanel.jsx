@@ -37,19 +37,23 @@ const BuildPanel = ({
                     </span>
                 </div>
                 {isConnected ? (
-                    <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        fontSize: '12px',
-                        color: '#10b981',
-                        fontWeight: '600',
-                        marginLeft: 'auto',
-                        background: '#ecfdf5',
-                        padding: '4px 8px',
-                        borderRadius: '4px',
-                        border: '1px solid #a7f3d0'
-                    }}>
+                    <div
+                        onClick={() => window.location.href = '/api/auth/login'}
+                        title="Click para reconectar/refrescar sesión"
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            fontSize: '12px',
+                            color: '#10b981',
+                            fontWeight: '600',
+                            marginLeft: 'auto',
+                            background: '#ecfdf5',
+                            padding: '4px 8px',
+                            borderRadius: '4px',
+                            border: '1px solid #a7f3d0',
+                            cursor: 'pointer'
+                        }}>
                         <span style={{ fontSize: '10px' }}>🟢</span> Conectado
                     </div>
                 ) : (
