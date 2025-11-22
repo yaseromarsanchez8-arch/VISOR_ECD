@@ -293,10 +293,39 @@ const BuildMapView = ({
             });
 
             // Click -> Select
+            // Click -> Select & Open Menu
             marker.addListener('click', (e) => {
-                // e.stop(); // Sometimes needed, sometimes interferes
                 if (onPinSelectRef.current) {
                     onPinSelectRef.current(pin.id);
+                }
+
+                // Open context menu on click too (for mobile/tablet friendliness)
+                // Use e.pixel if available, otherwise try to use domEvent
+                let x = 0;
+                let y = 0;
+
+                if (e.pixel) {
+                    x = e.pixel.x;
+                    y = e.pixel.y;
+                } else if (e.domEvent) {
+                    // Fallback to mouse/touch event coordinates relative to viewport
+                    // We need relative to container? The context menu uses absolute positioning.
+                    // If the container is relative, we might need offset.
+                    // But usually e.pixel is reliable for Google Maps markers.
+                    x = e.domEvent.clientX;
+                    y = e.domEvent.clientY;
+                }
+
+                if (x || y) {
+                    setContextMenu({
+                        visible: true,
+                        x: x,
+                        y: y,
+                        type: 'existing',
+                        pinId: pin.id,
+                        pinName: pin.name
+                    });
+                    setShowUploadOptions(false);
                 }
             });
 
