@@ -295,6 +295,11 @@ const BuildMapView = ({
             // Click -> Select
             // Click -> Select & Open Menu
             marker.addListener('click', (e) => {
+                // Stop propagation to prevent window click listener from closing the menu immediately
+                if (e.domEvent) {
+                    e.domEvent.stopPropagation();
+                }
+
                 if (onPinSelectRef.current) {
                     onPinSelectRef.current(pin.id);
                 }
