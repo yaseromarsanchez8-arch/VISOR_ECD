@@ -464,11 +464,10 @@ const BuildMapView = ({
     };
 
     const handleCameraUpload = () => {
-        // Use native device camera input (much more reliable on mobile)
-        if (cameraInputRef.current) {
-            cameraInputRef.current.click();
+        // Use custom in-app camera UI for better experience on both Desktop and Mobile
+        if (contextMenu && contextMenu.pinId) {
+            openCamera(contextMenu.pinId);
         }
-        setContextMenu(null);
     };
 
     const handleViewGallery = () => {

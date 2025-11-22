@@ -483,8 +483,9 @@ function App() {
     }
   }, [selectedPinId]);
 
-  const handleBuildFileUpload = async (file) => {
-    if (!selectedPinId) {
+  const handleBuildFileUpload = async (file, targetPinId = null) => {
+    const pinId = targetPinId || selectedPinId;
+    if (!pinId) {
       alert('Por favor, selecciona un punto en el mapa primero para asociar el documento.');
       return;
     }
@@ -511,7 +512,7 @@ function App() {
 
       // Add document to the selected PIN
       setBuildPins(prevPins => prevPins.map(pin => {
-        if (pin.id === selectedPinId) {
+        if (pin.id === pinId) {
           return {
             ...pin,
             documents: [...(pin.documents || []), {
