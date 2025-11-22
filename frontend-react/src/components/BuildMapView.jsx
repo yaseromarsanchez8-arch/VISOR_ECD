@@ -13,6 +13,7 @@ const BuildMapView = ({
 }) => {
     const mapContainerRef = useRef(null);
     const mapInstanceRef = useRef(null);
+    const overlayRef = useRef(null); // Helper for projections
     const markersRef = useRef({});
     const fileInputRef = useRef(null);
     const cameraInputRef = useRef(null);
@@ -240,6 +241,14 @@ const BuildMapView = ({
                 }
             });
 
+            // Helper overlay for projections
+            const overlay = new window.google.maps.OverlayView();
+            overlay.onAdd = () => { };
+            overlay.onRemove = () => { };
+            overlay.draw = () => { };
+            overlay.setMap(map);
+            overlayRef.current = overlay;
+
             mapInstanceRef.current = map;
         };
 
@@ -308,10 +317,21 @@ const BuildMapView = ({
                 let x = 0;
                 let y = 0;
 
-                if (e.pixel) {
+                // Try precise projection first (Best for consistency)
+                if (overlayRef.current) {
+                    const projection = overlayRef.current.getProjection();
+                    if (projection && e.latLng) {
+                        const point = projection.fromLatLngToContainerPixel(e.latLng);
+                        x = point.x;
+                        y = point.y;
+                    }
+                }
+
+                // Fallback if projection failed (e.g. overlay not ready)
+                if ((!x && !y) && e.pixel) {
                     x = e.pixel.x;
                     y = e.pixel.y;
-                } else if (e.domEvent && mapContainerRef.current) {
+                } else if ((!x && !y) && e.domEvent && mapContainerRef.current) {
                     const rect = mapContainerRef.current.getBoundingClientRect();
                     const evt = e.domEvent;
 
