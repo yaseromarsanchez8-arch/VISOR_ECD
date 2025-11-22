@@ -31,7 +31,7 @@ ALLOWED_GIS_EXTENSIONS = {'kml', 'kmz'}
 ALLOWED_DOC_EXTENSIONS = {
     'apng', 'avif', 'csv', 'doc', 'docx', 'gif', 'jpeg', 'jpg', 'odp', 'ods',
     'odt', 'pdf', 'png', 'ppt', 'pptx', 'svg', 'txt', 'webp', 'xls', 'xlsx',
-    'kml', 'kmz'
+    'kml', 'kmz', 'iwm'
 }
 ACC_PROJECT_ID = os.getenv('ACC_PROJECT_ID', 'b.50e13047-2a8c-4c8b-af53-8d509a281dba')
 ACC_FOLDER_URN = os.getenv('ACC_FOLDER_URN', 'urn:adsk.wipprod:fs.folder:co.OdZ3iENkTh6vroYpYJxylA')
@@ -732,12 +732,15 @@ def auth_callback():
     if not code:
         return jsonify({'error': 'Falta code'}), 400
 
+    # Use the same redirect_uri as the login route
+    redirect_uri = os.getenv('APS_REDIRECT_URI', 'http://localhost:3000/api/auth/callback')
+
     payload = {
         'grant_type': 'authorization_code',
         'code': code,
         'client_id': os.getenv('APS_CLIENT_ID'),
         'client_secret': os.getenv('APS_CLIENT_SECRET'),
-        'redirect_uri': os.getenv('APS_REDIRECT_URI', 'http://localhost:5000/api/auth/callback')
+        'redirect_uri': redirect_uri
     }
     try:
         resp = requests.post('https://developer.api.autodesk.com/authentication/v2/token', data=payload)
@@ -753,8 +756,9 @@ def auth_callback():
             # Do not fail the callback if writing the file fails.
             print(f"[auth] No se pudo guardar tokens.json: {write_err}")
         
-        # Redirigir al frontend con un indicador de éxito
-        return redirect('http://localhost:5173?auth=success')
+        # Redirect to the frontend (configured via env var or default to localhost)
+        frontend_url = os.getenv('APS_FRONTEND_URL', 'http://localhost:5173')
+        return redirect(f'{frontend_url}?auth=success')
     except requests.exceptions.RequestException as e:
         return jsonify({'error': str(e)}), 500
 

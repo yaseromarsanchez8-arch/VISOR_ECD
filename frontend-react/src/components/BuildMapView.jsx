@@ -299,6 +299,7 @@ const BuildMapView = ({
                 // Stop propagation
                 if (event.domEvent) {
                     event.domEvent.stopPropagation();
+                    event.domEvent.preventDefault(); // Prevent ghost clicks
                 }
                 event.stop();
 
@@ -314,8 +315,8 @@ const BuildMapView = ({
                 if (event.domEvent && mapContainerRef.current) {
                     const rect = mapContainerRef.current.getBoundingClientRect();
                     // Handle both Mouse and Touch events if possible
-                    const clientX = event.domEvent.clientX || (event.domEvent.touches?.[0]?.clientX);
-                    const clientY = event.domEvent.clientY || (event.domEvent.touches?.[0]?.clientY);
+                    const clientX = event.domEvent.clientX || (event.domEvent.touches?.[0]?.clientX) || (event.domEvent.changedTouches?.[0]?.clientX);
+                    const clientY = event.domEvent.clientY || (event.domEvent.touches?.[0]?.clientY) || (event.domEvent.changedTouches?.[0]?.clientY);
 
                     if (clientX !== undefined && clientY !== undefined) {
                         x = clientX - rect.left;

@@ -111,7 +111,7 @@ const BuildPanel = ({
                 <label className={`build-upload-btn ${!selectedPin ? 'disabled' : ''}`}>
                     <input
                         type="file"
-                        accept=".pdf,.png,.jpg,.jpeg,.webp,.svg,.doc,.docx,.xls,.xlsx,.kml,.kmz,.rvt,.dwg"
+                        accept=".pdf,.png,.jpg,.jpeg,.webp,.svg,.doc,.docx,.xls,.xlsx,.kml,.kmz,.rvt,.dwg,.iwm"
                         onChange={handleFileChange}
                         disabled={uploading || !selectedPin}
                     />
