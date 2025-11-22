@@ -400,9 +400,10 @@ const Viewer = ({ models, sprites, showSprites, activeSpriteId, onSpriteSelect, 
     }, [placementMode, onPlacementComplete, viewerReady]);
 
     // Context menu for sprite creation (right-click / long-press)
+    // ONLY active when NOT in placement mode
     useEffect(() => {
         const viewer = viewerRef.current;
-        if (!viewer || !viewerReady) return;
+        if (!viewer || !viewerReady || placementMode) return; // Don't interfere with placement mode
 
         const canvas = viewer.canvas || viewer.impl?.canvas || viewer.container;
         if (!canvas) return;
@@ -500,7 +501,7 @@ const Viewer = ({ models, sprites, showSprites, activeSpriteId, onSpriteSelect, 
                 clearTimeout(longPressTimerRef.current);
             }
         };
-    }, [viewerReady]);
+    }, [viewerReady, placementMode]);
 
     const handleCreateSpriteFromMenu = () => {
         if (contextMenu && contextMenu.position && onPlacementComplete) {
