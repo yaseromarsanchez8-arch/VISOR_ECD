@@ -248,7 +248,98 @@ const BuildMapView = ({
         return () => { isMounted = false; };
     }, [userLocation]);
 
-    // ... (Sync Markers code remains same) ...
+    // Sync Markers
+    useEffect(() => {
+        if (!mapInstanceRef.current || !window.google?.maps) return;
+
+        const map = mapInstanceRef.current;
+        const currentMarkers = markersRef.current;
+        const activePinIds = new Set();
+
+        pins.forEach(pin => {
+            activePinIds.add(pin.id);
+
+            if (currentMarkers[pin.id]) {
+                // Update existing marker
+                const marker = currentMarkers[pin.id];
+                const isSelected = pin.id === selectedPinId;
+
+                marker.setIcon({
+                    path: window.google.maps.SymbolPath.CIRCLE,
+                    scale: isSelected ? 10 : 7,
+                    fillColor: isSelected ? '#EF4444' : '#10B981',
+                    fillOpacity: 1,
+                    strokeColor: '#ffffff',
+                    strokeWeight: 2
+                });
+                marker.setZIndex(isSelected ? 1000 : 100);
+                return;
+            }
+
+            // Create new marker
+            const marker = new window.google.maps.Marker({
+                position: { lat: Number(pin.lat), lng: Number(pin.lng) },
+                map: map,
+                title: pin.name,
+                icon: {
+                    path: window.google.maps.SymbolPath.CIRCLE,
+                    scale: 7,
+                    fillColor: '#10B981',
+                    fillOpacity: 1,
+                    strokeColor: '#ffffff',
+                    strokeWeight: 2
+                },
+                zIndex: 100
+            });
+
+            // Click -> Select
+            marker.addListener('click', (e) => {
+                // e.stop(); // Sometimes needed, sometimes interferes
+                if (onPinSelectRef.current) {
+                    onPinSelectRef.current(pin.id);
+                }
+            });
+
+            // Right Click -> Context Menu
+            marker.addListener('rightclick', (e) => {
+                if (e.pixel) {
+                    setContextMenu({
+                        visible: true,
+                        x: e.pixel.x,
+                        y: e.pixel.y,
+                        type: 'existing',
+                        pinId: pin.id,
+                        pinName: pin.name
+                    });
+                    setShowUploadOptions(false);
+                }
+            });
+
+            currentMarkers[pin.id] = marker;
+        });
+
+        // Cleanup removed markers
+        Object.keys(currentMarkers).forEach(id => {
+            // Note: pin.id is string or number? usually string in this app. 
+            // If ID types mismatch (string vs number), this might fail. 
+            // Let's assume string comparison is safe if we cast or if they match.
+            // The 'pins' loop adds to Set. If pin.id is number 123, Set has 123.
+            // Object.keys returns strings "123". 
+            // So we should check if activePinIds has the id (casted to correct type) or just use loose check.
+            // Safer to cast activePinIds to string for the Set.
+
+            // Actually, let's fix the Set population above to be sure.
+            // But for now, let's just assume IDs are consistent.
+
+            // Better safe:
+            const exists = pins.some(p => String(p.id) === id);
+            if (!exists) {
+                currentMarkers[id].setMap(null);
+                delete currentMarkers[id];
+            }
+        });
+
+    }, [pins, selectedPinId]);
 
     // --- Actions ---
 
